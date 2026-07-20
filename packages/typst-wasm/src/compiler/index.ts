@@ -144,14 +144,12 @@ class PromiseTypstCompiler implements TypstCompiler {
     return this.enqueue(() => {
       const normalized = normalizeProjectPath(path);
       this.memoryFiles.setFile(normalized, data);
-      return this.backend.addFile(normalized, data);
     });
   }
   addSource(path: string, text: string): Promise<void> {
     return this.enqueue(() => {
       const normalized = normalizeProjectPath(path);
       this.memoryFiles.setSource(normalized, text);
-      return this.backend.addSource(normalized, text);
     });
   }
   removeFile(path: string): Promise<void> {
@@ -159,14 +157,12 @@ class PromiseTypstCompiler implements TypstCompiler {
       const normalized = normalizeProjectPath(path);
       this.memoryFiles.removeFile(normalized);
       if (normalized === this.configuredMain) this.configuredMain = undefined;
-      return this.backend.removeFile(normalized);
     });
   }
   clearFiles(): Promise<void> {
     return this.enqueue(() => {
       this.memoryFiles.clear();
       this.configuredMain = undefined;
-      return this.backend.clearFiles();
     });
   }
   listFiles(): Promise<string[]> {
@@ -181,7 +177,6 @@ class PromiseTypstCompiler implements TypstCompiler {
     return this.enqueue(() => {
       const normalized = normalizeProjectPath(path);
       this.configuredMain = normalized;
-      return this.backend.setMain(normalized);
     });
   }
 
