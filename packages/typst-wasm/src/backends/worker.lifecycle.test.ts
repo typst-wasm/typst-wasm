@@ -126,23 +126,6 @@ describe("worker service lifecycle", () => {
     await workerService.dispose();
   });
 
-  it("rejects all outstanding commands when the worker fails", async () => {
-    const workerService = await makeService();
-    await workerService.init();
-    workerState.autoRespond = false;
-    const commands = [
-      workerService.listFiles(),
-      workerService.compile({ format: "svg", main: "main.typ" }),
-    ];
-
-    workerState.emitError?.(new Error("worker crashed"));
-    await expect(commands[0]).rejects.toThrow(
-      "Worker command failed: list_files",
-    );
-    await expect(commands[1]).rejects.toThrow("Worker command failed: compile");
-    await workerService.dispose();
-  });
-
   it("rejects pending initialization when the worker fails", async () => {
     const workerService = await makeService();
     workerState.autoRespond = false;

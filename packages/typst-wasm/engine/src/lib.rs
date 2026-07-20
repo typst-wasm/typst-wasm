@@ -1,7 +1,6 @@
 mod compile;
 mod dependencies;
 mod diagnostics;
-mod files;
 mod fonts;
 mod metadata;
 mod paths;
@@ -43,35 +42,6 @@ impl GuestCompiler for Compiler {
 
     fn add_font(&self, data: Vec<u8>) -> Result<String, OperationError> {
         fonts::add_font(&mut self.state.borrow_mut(), data)
-    }
-
-    fn add_file(&self, path: String, data: Vec<u8>) -> Result<(), OperationError> {
-        files::add_file(&mut self.state.borrow_mut(), path, data)
-    }
-
-    fn add_source(&self, path: String, text: String) -> Result<(), OperationError> {
-        files::add_source(&mut self.state.borrow_mut(), path, text)
-    }
-
-    fn set_main(&self, path: String) -> Result<(), OperationError> {
-        files::set_main(&mut self.state.borrow_mut(), path)
-    }
-
-    fn remove_file(&self, path: String) -> Result<bool, OperationError> {
-        files::remove_file(&mut self.state.borrow_mut(), path)
-    }
-
-    fn clear_files(&self) -> Result<(), OperationError> {
-        files::clear_files(&mut self.state.borrow_mut());
-        Ok(())
-    }
-
-    fn list_files(&self) -> Result<Vec<String>, OperationError> {
-        Ok(files::list_files(&self.state.borrow()))
-    }
-
-    fn has_file(&self, path: String) -> Result<bool, OperationError> {
-        files::has_file(&self.state.borrow(), path)
     }
 
     fn compile(&self, options: CompileOptions) -> Result<CompileSuccess, CompileFailure> {

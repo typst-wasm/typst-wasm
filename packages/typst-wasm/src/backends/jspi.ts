@@ -71,43 +71,6 @@ export class JspiService {
     }, "add-fonts");
   }
 
-  async addFile(path: string, data: Uint8Array): Promise<void> {
-    this.withCompiler(
-      (compiler) => void compiler.addFile(path, data),
-      "add-file",
-    );
-  }
-
-  async addSource(path: string, text: string): Promise<void> {
-    this.withCompiler(
-      (compiler) => void compiler.addSource(path, text),
-      "add-source",
-    );
-  }
-
-  async removeFile(path: string): Promise<void> {
-    this.withCompiler(
-      (compiler) => void compiler.removeFile(path),
-      "remove-file",
-    );
-  }
-
-  async clearFiles(): Promise<void> {
-    this.withCompiler((compiler) => void compiler.clearFiles(), "clear-files");
-  }
-
-  async listFiles(): Promise<string[]> {
-    return this.withCompiler((compiler) => compiler.listFiles(), "list-files");
-  }
-
-  async hasFile(path: string): Promise<boolean> {
-    return this.withCompiler((compiler) => compiler.hasFile(path), "has-file");
-  }
-
-  async setMain(path: string): Promise<void> {
-    this.withCompiler((compiler) => void compiler.setMain(path), "set-main");
-  }
-
   async compile(options: EngineCompileOptions): Promise<EngineCompileSuccess> {
     this.assertNotDisposed();
     const compile = this.compileAsync;

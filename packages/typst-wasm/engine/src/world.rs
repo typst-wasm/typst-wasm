@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use typst::diag::{FileError, FileResult};
@@ -10,10 +9,8 @@ use typst::{Library, World};
 
 use crate::dependencies::DependencyTrace;
 use crate::file_store::FileStore;
-use crate::state::FileEntry;
 
 pub struct CompileRuntime {
-    pub fetched_files: HashMap<FileId, FileEntry>,
     pub dependencies: DependencyTrace,
 }
 
@@ -22,7 +19,6 @@ pub struct CompileWorld {
     font_book: LazyHash<FontBook>,
     fonts: Vec<Font>,
     main: FileId,
-    explicit_files: HashMap<FileId, FileEntry>,
     runtime: Mutex<CompileRuntime>,
     file_store: Arc<Mutex<FileStore>>,
 }
@@ -33,7 +29,6 @@ impl CompileWorld {
         font_book: LazyHash<FontBook>,
         fonts: Vec<Font>,
         main: FileId,
-        explicit_files: HashMap<FileId, FileEntry>,
         file_store: Arc<Mutex<FileStore>>,
     ) -> Self {
         Self {
@@ -41,10 +36,8 @@ impl CompileWorld {
             font_book,
             fonts,
             main,
-            explicit_files,
             file_store,
             runtime: Mutex::new(CompileRuntime {
-                fetched_files: HashMap::new(),
                 dependencies: DependencyTrace::default(),
             }),
         }
@@ -98,14 +91,11 @@ impl World for CompileWorld {
 mod loaders {
     use super::*;
 
-    use crate::state::{FileEntry, FileOrigin, ResourceKind};
+    use crate::state::{FileOrigin, ResourceKind};
     use crate::typst::engine::host;
     use crate::typst::engine::types::{FetchError, FetchRequest, FileKind};
 
     pub fn load_source(world: &CompileWorld, id: FileId) -> FileResult<Source> {
-        if let Some(entry) = world.explicit_files.get(&id) {
-            return entry_to_source(id, entry);
-        }
         let bytes = load_bytes(world, id)?;
         let text = std::str::from_utf8(bytes.as_slice())
             .map_err(|_| FileError::Other(Some("source file is not valid UTF-8".into())))?;
@@ -122,9 +112,6 @@ mod loaders {
     }
 
     pub fn load_file(world: &CompileWorld, id: FileId) -> FileResult<Bytes> {
-        if let Some(entry) = world.explicit_files.get(&id) {
-            return entry_to_bytes(entry);
-        }
         load_bytes(world, id)
     }
 
@@ -210,27 +197,6 @@ mod loaders {
             FileKind::Project => ResourceKind::Project,
             FileKind::Package => ResourceKind::Package,
             FileKind::Url => ResourceKind::Url,
-        }
-    }
-
-    fn entry_to_source(id: FileId, entry: &FileEntry) -> FileResult<Source> {
-        match entry {
-            FileEntry::Source { source, .. } => Ok(source.clone()),
-
-            FileEntry::Bytes { bytes, .. } => {
-                let text = std::str::from_utf8(bytes.as_slice())
-                    .map_err(|_| FileError::Other(Some("source file is not valid UTF-8".into())))?;
-
-                Ok(Source::new(id, text.to_owned()))
-            }
-        }
-    }
-
-    fn entry_to_bytes(entry: &FileEntry) -> FileResult<Bytes> {
-        match entry {
-            FileEntry::Bytes { bytes, .. } => Ok(bytes.clone()),
-
-            FileEntry::Source { source, .. } => Ok(Bytes::from_string(source.text().to_owned())),
         }
     }
 }

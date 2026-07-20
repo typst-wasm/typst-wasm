@@ -17,18 +17,18 @@ describe("message guards", () => {
   });
 
   it("only accepts known request envelopes", () => {
-    expect(isMainToWorkerMessage({ kind: "clear_files", requestId: 1 })).toBe(
-      true,
-    );
+    expect(
+      isMainToWorkerMessage({ kind: "add_fonts", requestId: 1, payload: {} }),
+    ).toBe(true);
     expect(
       isMainToWorkerMessage({ kind: "compile", requestId: 1, payload: {} }),
     ).toBe(true);
     expect(isMainToWorkerMessage({ kind: "compile", requestId: 1 })).toBe(
       false,
     );
-    expect(
-      isMainToWorkerMessage({ kind: "clear_files", requestId: 1, payload: {} }),
-    ).toBe(false);
+    expect(isMainToWorkerMessage({ kind: "add_fonts", requestId: 1 })).toBe(
+      false,
+    );
     expect(isMainToWorkerMessage({ kind: "unknown", requestId: 1 })).toBe(
       false,
     );

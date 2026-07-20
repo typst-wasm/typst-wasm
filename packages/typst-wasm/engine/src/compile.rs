@@ -20,13 +20,11 @@ pub fn compile(
         CompileSnapshot {
             font_book: state.font_book.clone(),
             fonts: state.fonts.clone(),
-            files: state.files.clone(),
-            persistent_main: state.main_id,
             file_store: state.file_store.clone(),
         }
     };
 
-    let main = resolve_main(options.main.as_deref(), snapshot.persistent_main)?;
+    let main = resolve_main(options.main.as_deref())?;
 
     snapshot
         .file_store
@@ -43,7 +41,6 @@ pub fn compile(
         snapshot.font_book,
         snapshot.fonts,
         main,
-        snapshot.files,
         snapshot.file_store,
     );
 
@@ -62,23 +59,18 @@ pub fn compile(
 struct CompileSnapshot {
     font_book: LazyHash<typst::text::FontBook>,
     fonts: Vec<typst::text::Font>,
-    files: std::collections::HashMap<typst::syntax::FileId, crate::state::FileEntry>,
-    persistent_main: Option<typst::syntax::FileId>,
     file_store: std::sync::Arc<std::sync::Mutex<crate::file_store::FileStore>>,
 }
 
-fn resolve_main(
-    override_path: Option<&str>,
-    persistent_main: Option<typst::syntax::FileId>,
-) -> Result<typst::syntax::FileId, CompileFailure> {
+fn resolve_main(override_path: Option<&str>) -> Result<typst::syntax::FileId, CompileFailure> {
     if let Some(path) = override_path {
         return crate::paths::project_file_id(path)
             .map_err(crate::diagnostics::operation_compile_failure);
     }
 
-    persistent_main.ok_or_else(|| {
-        crate::diagnostics::simple_compile_failure("no main Typst file has been configured")
-    })
+    Err(crate::diagnostics::simple_compile_failure(
+        "no main Typst file has been configured",
+    ))
 }
 
 fn build_compile_library(options: &CompileOptions) -> Result<LazyHash<Library>, CompileFailure> {

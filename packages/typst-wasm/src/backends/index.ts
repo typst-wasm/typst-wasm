@@ -18,13 +18,6 @@ export type BackendService = {
   init(): Promise<void>;
   dispose(): Promise<void>;
   addFonts(...fonts: FontInput[]): Promise<void>;
-  addFile(path: string, data: Uint8Array): Promise<void>;
-  addSource(path: string, text: string): Promise<void>;
-  removeFile(path: string): Promise<void>;
-  clearFiles(): Promise<void>;
-  listFiles(): Promise<string[]>;
-  hasFile(path: string): Promise<boolean>;
-  setMain(path: string): Promise<void>;
   compile(options: EngineCompileOptions): Promise<EngineCompileSuccess>;
 };
 

@@ -36,9 +36,19 @@ describe("worker transport", () => {
       () => undefined,
     );
 
-    transport.post({ kind: "clear_files", requestId: 1 });
+    transport.post({
+      kind: "compile",
+      requestId: 1,
+      payload: { options: { format: "html" } },
+    });
 
-    expect(worker.messages).toEqual([{ kind: "clear_files", requestId: 1 }]);
+    expect(worker.messages).toEqual([
+      {
+        kind: "compile",
+        requestId: 1,
+        payload: { options: { format: "html" } },
+      },
+    ]);
   });
 
   it("reports invalid inbound messages", () => {

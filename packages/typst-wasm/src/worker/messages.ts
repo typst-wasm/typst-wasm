@@ -16,25 +16,13 @@ export type WorkerToMainMessage = RpcResponseMessage | WorkerEventMessage;
 
 const commandKinds = [
   "init",
-  "add_file",
-  "add_source",
   "add_fonts",
-  "remove_file",
-  "clear_files",
-  "set_main",
   "compile",
-  "list_files",
-  "has_file",
 ] as const satisfies readonly (keyof TypstWorkerProtocol)[];
 const payloadCommands = new Set<keyof TypstWorkerProtocol>([
   "init",
-  "add_file",
-  "add_source",
   "add_fonts",
-  "remove_file",
-  "set_main",
   "compile",
-  "has_file",
 ]);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

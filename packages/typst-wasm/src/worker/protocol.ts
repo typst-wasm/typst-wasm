@@ -170,44 +170,9 @@ export interface TypstWorkerProtocol {
     response: void;
   };
 
-  add_file: {
-    request: {
-      path: string;
-      data: Uint8Array;
-    };
-    response: void;
-  };
-
-  add_source: {
-    request: {
-      path: string;
-      text: string;
-    };
-    response: void;
-  };
-
   add_fonts: {
     request: {
       data: Uint8Array[];
-    };
-    response: void;
-  };
-
-  remove_file: {
-    request: {
-      path: string;
-    };
-    response: void;
-  };
-
-  clear_files: {
-    request: void;
-    response: void;
-  };
-
-  set_main: {
-    request: {
-      path: string;
     };
     response: void;
   };
@@ -217,18 +182,6 @@ export interface TypstWorkerProtocol {
       options: EngineCompileOptions;
     };
     response: EngineCompileSuccess;
-  };
-
-  list_files: {
-    request: void;
-    response: string[];
-  };
-
-  has_file: {
-    request: {
-      path: string;
-    };
-    response: boolean;
   };
 }
 

@@ -38,13 +38,6 @@ export interface EngineImports {
 
 export interface EngineCompiler {
   addFont(data: Uint8Array): string;
-  addFile(path: string, data: Uint8Array): void;
-  addSource(path: string, text: string): void;
-  setMain(path: string): void;
-  removeFile(path: string): boolean;
-  clearFiles(): void;
-  listFiles(): string[];
-  hasFile(path: string): boolean;
   compile(options: CompileOptions): CompileSuccess | Promise<CompileSuccess>;
 }
 

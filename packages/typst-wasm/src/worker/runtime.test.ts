@@ -24,13 +24,6 @@ const makePort = (): Port & {
 const compilerWithSpies = () => {
   const compiler: EngineCompiler = {
     addFont: (data) => data.byteLength.toString(),
-    addFile: () => undefined,
-    addSource: () => undefined,
-    setMain: () => undefined,
-    removeFile: () => true,
-    clearFiles: () => undefined,
-    listFiles: () => ["main.typ"],
-    hasFile: () => true,
     compile: async (options) => ({
       output: { tag: "html", val: `<p>${options.format}</p>` },
       diagnostics: [],
@@ -98,7 +91,12 @@ describe("installTypstWorkerRuntime", () => {
     const port = makePort();
     installTypstWorkerRuntime(port, async () => engine(compilerWithSpies()));
 
-    expect(await response(port, request("list_files", 3))).toMatchObject({
+    expect(
+      await response(
+        port,
+        request("compile", 3, { options: { format: "html" } }),
+      ),
+    ).toMatchObject({
       requestId: 3,
       error: { code: "COMPILER_NOT_INITIALIZED" },
     });
@@ -113,17 +111,7 @@ describe("installTypstWorkerRuntime", () => {
     const port = makePort();
     const calls: string[] = [];
     const compiler = compilerWithSpies();
-    for (const name of [
-      "addFile",
-      "addSource",
-      "addFont",
-      "removeFile",
-      "clearFiles",
-      "setMain",
-      "compile",
-      "listFiles",
-      "hasFile",
-    ] as const) {
+    for (const name of ["addFont", "compile"] as const) {
       const original = compiler[name] as (...args: never[]) => unknown;
       compiler[name] = ((...args: never[]) => {
         calls.push(name);
@@ -144,33 +132,13 @@ describe("installTypstWorkerRuntime", () => {
 
     await response(
       port,
-      request("add_file", 11, { path: "a", data: new Uint8Array([1]) }),
-    );
-    await response(port, request("add_source", 12, { path: "a", text: "a" }));
-    await response(
-      port,
       request("add_fonts", 13, { data: [new Uint8Array([1])] }),
     );
-    await response(port, request("remove_file", 14, { path: "a" }));
-    await response(port, request("clear_files", 15));
-    await response(port, request("set_main", 16, { path: "a" }));
     await response(
       port,
       request("compile", 17, { options: { format: "html" } }),
     );
-    await response(port, request("list_files", 18));
-    await response(port, request("has_file", 19, { path: "a" }));
-    expect(calls).toEqual([
-      "addFile",
-      "addSource",
-      "addFont",
-      "removeFile",
-      "clearFiles",
-      "setMain",
-      "compile",
-      "listFiles",
-      "hasFile",
-    ]);
+    expect(calls).toEqual(["addFont", "compile"]);
   });
 
   it.each(["load", "instantiate", "compiler"])(
@@ -217,7 +185,7 @@ describe("installTypstWorkerRuntime", () => {
   it("serializes nested error payloads and maps command failures", async () => {
     const port = makePort();
     const compiler = compilerWithSpies();
-    compiler.clearFiles = () => {
+    compiler.compile = () => {
       throw { cause: { payload: { reason: "bad" } } };
     };
     installTypstWorkerRuntime(port, async () => engine(compiler));
@@ -228,11 +196,16 @@ describe("installTypstWorkerRuntime", () => {
         coreModules,
       }),
     );
-    expect(await response(port, request("clear_files", 31))).toEqual({
+    expect(
+      await response(
+        port,
+        request("compile", 31, { options: { format: "html" } }),
+      ),
+    ).toEqual({
       requestId: 31,
       error: {
         code: "COMMAND_FAILED",
-        message: "Worker command failed: clear-files",
+        message: "Worker command failed: compile",
         cause: { payload: { reason: "bad" } },
       },
     });

@@ -211,42 +211,9 @@ export const installTypstWorkerRuntime = (
         }
         return successResponse(request.requestId, undefined);
       }
-      case "add_file":
-        runCompilerCommand(request.requestId, "add-file", (readyCompiler) => {
-          readyCompiler.addFile(request.payload.path, request.payload.data);
-        });
-        return successResponse(request.requestId, undefined);
-      case "add_source":
-        runCompilerCommand(request.requestId, "add-source", (readyCompiler) => {
-          readyCompiler.addSource(request.payload.path, request.payload.text);
-        });
-        return successResponse(request.requestId, undefined);
       case "add_fonts":
         runCompilerCommand(request.requestId, "add-fonts", (readyCompiler) => {
           for (const font of request.payload.data) readyCompiler.addFont(font);
-        });
-        return successResponse(request.requestId, undefined);
-      case "remove_file":
-        runCompilerCommand(
-          request.requestId,
-          "remove-file",
-          (readyCompiler) => {
-            readyCompiler.removeFile(request.payload.path);
-          },
-        );
-        return successResponse(request.requestId, undefined);
-      case "clear_files":
-        runCompilerCommand(
-          request.requestId,
-          "clear-files",
-          (readyCompiler) => {
-            readyCompiler.clearFiles();
-          },
-        );
-        return successResponse(request.requestId, undefined);
-      case "set_main":
-        runCompilerCommand(request.requestId, "set-main", (readyCompiler) => {
-          readyCompiler.setMain(request.payload.path);
         });
         return successResponse(request.requestId, undefined);
       case "compile":
@@ -256,20 +223,6 @@ export const installTypstWorkerRuntime = (
             request.requestId,
             "compile",
             (readyCompiler) => readyCompiler.compile(request.payload.options),
-          ),
-        );
-      case "list_files":
-        return successResponse(
-          request.requestId,
-          runCompilerCommand(request.requestId, "list-files", (readyCompiler) =>
-            readyCompiler.listFiles(),
-          ),
-        );
-      case "has_file":
-        return successResponse(
-          request.requestId,
-          runCompilerCommand(request.requestId, "has-file", (readyCompiler) =>
-            readyCompiler.hasFile(request.payload.path),
           ),
         );
     }

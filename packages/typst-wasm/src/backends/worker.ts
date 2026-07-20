@@ -112,41 +112,6 @@ export class WorkerService {
     return this.rpcClient.call("add_fonts", { data });
   }
 
-  addFile(path: string, data: Uint8Array): Promise<void> {
-    this.assertNotDisposed();
-    return this.rpcClient.call("add_file", { path, data });
-  }
-
-  addSource(path: string, text: string): Promise<void> {
-    this.assertNotDisposed();
-    return this.rpcClient.call("add_source", { path, text });
-  }
-
-  removeFile(path: string): Promise<void> {
-    this.assertNotDisposed();
-    return this.rpcClient.call("remove_file", { path });
-  }
-
-  clearFiles(): Promise<void> {
-    this.assertNotDisposed();
-    return this.rpcClient.call("clear_files");
-  }
-
-  listFiles(): Promise<string[]> {
-    this.assertNotDisposed();
-    return this.rpcClient.call("list_files");
-  }
-
-  hasFile(path: string): Promise<boolean> {
-    this.assertNotDisposed();
-    return this.rpcClient.call("has_file", { path });
-  }
-
-  setMain(path: string): Promise<void> {
-    this.assertNotDisposed();
-    return this.rpcClient.call("set_main", { path });
-  }
-
   compile(options: EngineCompileOptions): Promise<EngineCompileSuccess> {
     this.assertNotDisposed();
     return this.rpcClient.call("compile", { options });

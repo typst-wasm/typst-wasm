@@ -164,26 +164,6 @@ interface api {
 
     add-font: func(data: list<u8>) -> result<string, operation-error>;
 
-    add-file: func(
-      path: string,
-      data: list<u8>
-    ) -> result<_, operation-error>;
-
-    add-source: func(
-      path: string,
-      text: string
-    ) -> result<_, operation-error>;
-
-    set-main: func(path: string) -> result<_, operation-error>;
-
-    remove-file: func(path: string) -> result<bool, operation-error>;
-
-    clear-files: func() -> result<_, operation-error>;
-
-    list-files: func() -> result<list<string>, operation-error>;
-
-    has-file: func(path: string) -> result<bool, operation-error>;
-
     compile: func(
       options: compile-options
     ) -> result<compile-success, compile-failure>;

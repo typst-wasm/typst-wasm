@@ -1,25 +1,9 @@
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use typst::foundations::Bytes;
-use typst::syntax::{FileId, Source};
 use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
 
 use crate::file_store::FileStore;
-
-#[derive(Clone)]
-pub enum FileEntry {
-    Source {
-        source: Source,
-        origin: Option<FileOrigin>,
-    },
-
-    Bytes {
-        bytes: Bytes,
-        origin: Option<FileOrigin>,
-    },
-}
 
 #[derive(Clone, Debug)]
 pub struct FileOrigin {
@@ -39,8 +23,6 @@ pub enum ResourceKind {
 pub struct CompilerState {
     pub fonts: Vec<Font>,
     pub font_book: LazyHash<FontBook>,
-    pub files: HashMap<FileId, FileEntry>,
-    pub main_id: Option<FileId>,
     pub file_store: Arc<Mutex<FileStore>>,
 }
 
@@ -49,8 +31,6 @@ impl CompilerState {
         Self {
             fonts: Vec::new(),
             font_book: LazyHash::new(FontBook::new()),
-            files: HashMap::new(),
-            main_id: None,
             file_store: Arc::new(Mutex::new(FileStore::new())),
         }
     }
