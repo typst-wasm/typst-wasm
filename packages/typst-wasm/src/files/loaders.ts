@@ -10,6 +10,40 @@ export type FetchImpl = (
   init?: Parameters<typeof fetch>[1],
 ) => ReturnType<typeof fetch>;
 
+export class MemoryFileLoader {
+  private readonly files = new Map<string, Uint8Array>();
+
+  async load(request: FetchRequest): Promise<FetchedFile | null> {
+    if (request.kind !== "project") return null;
+    const data = this.files.get(request.path);
+    return data ? { data: new Uint8Array(data) } : null;
+  }
+
+  setSource(path: string, text: string): void {
+    this.files.set(path, new TextEncoder().encode(text));
+  }
+
+  setFile(path: string, data: Uint8Array): void {
+    this.files.set(path, new Uint8Array(data));
+  }
+
+  removeFile(path: string): void {
+    this.files.delete(path);
+  }
+
+  clear(): void {
+    this.files.clear();
+  }
+
+  listFiles(): string[] {
+    return [...this.files.keys()];
+  }
+
+  hasFile(path: string): boolean {
+    return this.files.has(path);
+  }
+}
+
 export class FileLoaderManager {
   private loaders: TypstFileLoader[];
 

@@ -1,6 +1,11 @@
 import { createRuntimeBackend, type BackendService } from "../backends/index";
 import { CompileError } from "../errors";
-import { FileLoaderManager, makeFetchFileLoader } from "../files/loaders";
+import {
+  FileLoaderManager,
+  makeFetchFileLoader,
+  MemoryFileLoader,
+} from "../files/loaders";
+import { normalizeProjectPath } from "../files/paths";
 import { makePackageFileLoader, PackageManager } from "../files/packages";
 import { resolveLogger } from "../logging";
 import type {
@@ -108,74 +113,121 @@ const normalizeCompileResult = (
 
 class PromiseTypstCompiler implements TypstCompiler {
   private packageManager: PackageManager | null;
+  private configuredMain: string | undefined;
+  private accepting = true;
+  private queue = Promise.resolve();
 
   constructor(
     private readonly backend: BackendService,
     packageManager: PackageManager,
+    private readonly memoryFiles: MemoryFileLoader,
   ) {
     this.packageManager = packageManager;
   }
 
-  addFonts(...fonts: FontInput[]): Promise<void> {
-    return this.backend.addFonts(...fonts);
-  }
-  addFile(path: string, data: Uint8Array): Promise<void> {
-    return this.backend.addFile(path, data);
-  }
-  addSource(path: string, text: string): Promise<void> {
-    return this.backend.addSource(path, text);
-  }
-  removeFile(path: string): Promise<void> {
-    return this.backend.removeFile(path);
-  }
-  clearFiles(): Promise<void> {
-    return this.backend.clearFiles();
-  }
-  listFiles(): Promise<string[]> {
-    return this.backend.listFiles();
-  }
-  hasFile(path: string): Promise<boolean> {
-    return this.backend.hasFile(path);
-  }
-  setMain(path: string): Promise<void> {
-    return this.backend.setMain(path);
+  private enqueue<T>(operation: () => Promise<T> | T): Promise<T> {
+    if (!this.accepting) {
+      return Promise.reject(new Error("Compiler is being disposed"));
+    }
+    const result = this.queue.then(operation, operation);
+    this.queue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
   }
 
-  async compile<F extends CompileFormat>(
+  addFonts(...fonts: FontInput[]): Promise<void> {
+    return this.enqueue(() => this.backend.addFonts(...fonts));
+  }
+  addFile(path: string, data: Uint8Array): Promise<void> {
+    return this.enqueue(() => {
+      const normalized = normalizeProjectPath(path);
+      this.memoryFiles.setFile(normalized, data);
+      return this.backend.addFile(normalized, data);
+    });
+  }
+  addSource(path: string, text: string): Promise<void> {
+    return this.enqueue(() => {
+      const normalized = normalizeProjectPath(path);
+      this.memoryFiles.setSource(normalized, text);
+      return this.backend.addSource(normalized, text);
+    });
+  }
+  removeFile(path: string): Promise<void> {
+    return this.enqueue(() => {
+      const normalized = normalizeProjectPath(path);
+      this.memoryFiles.removeFile(normalized);
+      if (normalized === this.configuredMain) this.configuredMain = undefined;
+      return this.backend.removeFile(normalized);
+    });
+  }
+  clearFiles(): Promise<void> {
+    return this.enqueue(() => {
+      this.memoryFiles.clear();
+      this.configuredMain = undefined;
+      return this.backend.clearFiles();
+    });
+  }
+  listFiles(): Promise<string[]> {
+    return this.enqueue(() => this.memoryFiles.listFiles());
+  }
+  hasFile(path: string): Promise<boolean> {
+    return this.enqueue(() =>
+      this.memoryFiles.hasFile(normalizeProjectPath(path)),
+    );
+  }
+  setMain(path: string): Promise<void> {
+    return this.enqueue(() => {
+      const normalized = normalizeProjectPath(path);
+      this.configuredMain = normalized;
+      return this.backend.setMain(normalized);
+    });
+  }
+
+  compile<F extends CompileFormat>(
     options: CompileOptions<F>,
   ): Promise<CompileResult<F>> {
-    try {
-      const result = await this.backend.compile(
-        toEngineCompileOptions(options),
-      );
-      if (hasErrorDiagnostics(result.diagnostics)) {
-        throw new CompileError("Compilation failed", {
-          diagnostics: result.diagnostics,
-        });
+    return this.enqueue(async () => {
+      try {
+        const main = options.main
+          ? normalizeProjectPath(options.main)
+          : this.configuredMain;
+        const result = await this.backend.compile(
+          toEngineCompileOptions({ ...options, main }),
+        );
+        if (hasErrorDiagnostics(result.diagnostics)) {
+          throw new CompileError("Compilation failed", {
+            diagnostics: result.diagnostics,
+          });
+        }
+        return normalizeCompileResult(result) as CompileResult<F>;
+      } catch (cause) {
+        const payload = extractErrorPayload(cause) ?? cause;
+        if (
+          typeof payload === "object" &&
+          payload !== null &&
+          "diagnostics" in payload
+        ) {
+          const failure = payload as {
+            diagnostics: EngineDiagnostic[];
+            message?: string;
+          };
+          throw new CompileError(failure.message ?? "Compilation failed", {
+            diagnostics: failure.diagnostics,
+            cause,
+          });
+        }
+        if (cause instanceof CompileError) throw cause;
+        throw new CompileError(extractErrorMessage(cause), { cause });
       }
-      return normalizeCompileResult(result) as CompileResult<F>;
-    } catch (cause) {
-      const payload = extractErrorPayload(cause) ?? cause;
-      if (
-        typeof payload === "object" &&
-        payload !== null &&
-        "diagnostics" in payload
-      ) {
-        const failure = payload as {
-          diagnostics: EngineDiagnostic[];
-          message?: string;
-        };
-        throw new CompileError(failure.message ?? "Compilation failed", {
-          diagnostics: failure.diagnostics,
-          cause,
-        });
-      }
-      if (cause instanceof CompileError) throw cause;
-      throw new CompileError(extractErrorMessage(cause), { cause });
-    }
+    });
   }
 
   async dispose(): Promise<void> {
+    if (!this.accepting) return this.queue.then(() => undefined);
+    this.accepting = false;
+    await this.queue;
     this.packageManager?.dispose();
     this.packageManager = null;
     await this.backend.dispose();
@@ -196,7 +248,9 @@ export const createTypstCompiler = async (
     cache: options.packageCache,
     memoryPackageCacheCapacity: options.memoryPackageCacheCapacity,
   });
+  const memoryFiles = new MemoryFileLoader();
   const fileLoaderManager = new FileLoaderManager([
+    memoryFiles.load.bind(memoryFiles),
     ...(options.fileLoaders ?? []),
     makePackageFileLoader(packageManager),
     makeFetchFileLoader(options.fetch),
@@ -214,5 +268,5 @@ export const createTypstCompiler = async (
     await backend.dispose();
     throw error;
   }
-  return new PromiseTypstCompiler(backend, packageManager);
+  return new PromiseTypstCompiler(backend, packageManager, memoryFiles);
 };

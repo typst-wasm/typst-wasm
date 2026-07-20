@@ -1,7 +1,56 @@
 import { describe, expect, it, vi } from "vitest";
-import { FileLoaderManager, makeFetchFileLoader } from "./loaders";
+import {
+  FileLoaderManager,
+  makeFetchFileLoader,
+  MemoryFileLoader,
+} from "./loaders";
 import { makePackageFileLoader, PackageManager } from "./packages";
 import type { TypstFileLoader } from "../compiler/types";
+import { normalizeProjectPath } from "./paths";
+
+describe("memory file loader", () => {
+  it("owns only project files and returns defensive copies", async () => {
+    const loader = new MemoryFileLoader();
+    const input = new Uint8Array([1, 2]);
+    loader.setFile("assets/data.bin", input);
+    input[0] = 9;
+
+    const result = await loader.load({
+      path: "assets/data.bin",
+      kind: "project",
+    });
+    expect(result?.data).toEqual(new Uint8Array([1, 2]));
+    expect(loader.listFiles()).toEqual(["assets/data.bin"]);
+    expect(loader.hasFile("assets/data.bin")).toBe(true);
+    expect(
+      await loader.load({ path: "@pkg/file", kind: "package" }),
+    ).toBeNull();
+  });
+
+  it("encodes source and supports removal fallback", async () => {
+    const loader = new MemoryFileLoader();
+    loader.setSource("main.typ", "hello");
+    expect(await loader.load({ path: "main.typ", kind: "project" })).toEqual({
+      data: new TextEncoder().encode("hello"),
+    });
+    loader.removeFile("main.typ");
+    expect(await loader.load({ path: "main.typ", kind: "project" })).toBeNull();
+  });
+});
+
+describe("project paths", () => {
+  it.each([
+    ["main.typ", "main.typ"],
+    ["./src/../main.typ", "main.typ"],
+    ["src//nested.typ", "src/nested.typ"],
+  ])("normalizes %s", (input, expected) => {
+    expect(normalizeProjectPath(input)).toBe(expected);
+  });
+
+  it.each(["", "../main.typ", "/main.typ", "./"])("rejects %s", (input) =>
+    expect(() => normalizeProjectPath(input)).toThrow(),
+  );
+});
 
 describe("file loader manager", () => {
   it("tries loaders in order until one handles the request", async () => {
