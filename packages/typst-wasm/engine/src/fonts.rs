@@ -29,3 +29,20 @@ fn build_font_book(fonts: &[Font]) -> LazyHash<FontBook> {
 
     LazyHash::new(book)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_font_does_not_mutate_state() {
+        let mut state = CompilerState::new();
+        let font_count = state.fonts.len();
+
+        assert!(matches!(
+            add_font(&mut state, vec![0, 1, 2, 3]),
+            Err(OperationError::FontParseFailed)
+        ));
+        assert_eq!(state.fonts.len(), font_count);
+    }
+}
