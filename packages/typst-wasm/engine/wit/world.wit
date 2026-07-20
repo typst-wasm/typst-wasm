@@ -1,9 +1,6 @@
 package typst:engine;
 
 interface types {
-  // ---------------------------------------------------------------------------
-  // Diagnostics (plan 4.5)
-  // ---------------------------------------------------------------------------
   enum diagnostic-severity {
     warning,
     error,
@@ -22,9 +19,6 @@ interface types {
     trace: list<string>,
   }
 
-  // ---------------------------------------------------------------------------
-  // Metadata (plan 4.6)
-  // ---------------------------------------------------------------------------
   record custom-metadata {
     label: option<string>,
     value-json: string,
@@ -38,9 +32,6 @@ interface types {
     custom: list<custom-metadata>,
   }
 
-  // ---------------------------------------------------------------------------
-  // Resource fetching (plan 4.7)
-  // ---------------------------------------------------------------------------
   enum file-kind {
     project,
     %package,
@@ -131,9 +122,6 @@ interface types {
     dependencies: list<loaded-file>,
   }
 
-  // ---------------------------------------------------------------------------
-  // Dependency tracking (plan 4.8)
-  // ---------------------------------------------------------------------------
   record loaded-file {
     kind: file-kind,
     path: string,
