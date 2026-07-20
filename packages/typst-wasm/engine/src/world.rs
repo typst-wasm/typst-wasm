@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Bytes, Datetime, Duration};
@@ -9,6 +9,7 @@ use typst::utils::LazyHash;
 use typst::{Library, World};
 
 use crate::dependencies::DependencyTrace;
+use crate::file_store::FileStore;
 use crate::state::FileEntry;
 
 pub struct CompileRuntime {
@@ -23,6 +24,7 @@ pub struct CompileWorld {
     main: FileId,
     explicit_files: HashMap<FileId, FileEntry>,
     runtime: Mutex<CompileRuntime>,
+    file_store: Arc<Mutex<FileStore>>,
 }
 
 impl CompileWorld {
@@ -32,6 +34,7 @@ impl CompileWorld {
         fonts: Vec<Font>,
         main: FileId,
         explicit_files: HashMap<FileId, FileEntry>,
+        file_store: Arc<Mutex<FileStore>>,
     ) -> Self {
         Self {
             library,
@@ -39,6 +42,7 @@ impl CompileWorld {
             fonts,
             main,
             explicit_files,
+            file_store,
             runtime: Mutex::new(CompileRuntime {
                 fetched_files: HashMap::new(),
                 dependencies: DependencyTrace::default(),
@@ -102,83 +106,96 @@ mod loaders {
         if let Some(entry) = world.explicit_files.get(&id) {
             return entry_to_source(id, entry);
         }
+        let bytes = load_bytes(world, id)?;
+        let text = std::str::from_utf8(bytes.as_slice())
+            .map_err(|_| FileError::Other(Some("source file is not valid UTF-8".into())))?;
+        let text = text.strip_prefix('\u{feff}').unwrap_or(text);
 
-        if let Some(entry) = cached_entry(world, id) {
-            return entry_to_source(id, &entry);
+        let mut store = world.file_store.lock().expect("file store mutex poisoned");
+        let source = store.source(id);
+        let mut source = source.unwrap_or_else(|| Source::new(id, text.to_owned()));
+        if source.text() != text {
+            source.replace(text);
         }
-
-        let entry = fetch_from_host(id)?;
-
-        cache_entry(world, id, entry.clone());
-
-        entry_to_source(id, &entry)
+        store.replace_source(id, source.clone());
+        Ok(source)
     }
 
     pub fn load_file(world: &CompileWorld, id: FileId) -> FileResult<Bytes> {
         if let Some(entry) = world.explicit_files.get(&id) {
             return entry_to_bytes(entry);
         }
+        load_bytes(world, id)
+    }
 
-        if let Some(entry) = cached_entry(world, id) {
-            return entry_to_bytes(&entry);
+    fn load_bytes(world: &CompileWorld, id: FileId) -> FileResult<Bytes> {
+        let current = world
+            .file_store
+            .lock()
+            .expect("file store mutex poisoned")
+            .begin(id)
+            .expect("file slot reserved");
+        if let Some(bytes) = current.1 {
+            record_origin(world, id);
+            return bytes.map_err(|message| FileError::Other(Some(message.into())));
         }
 
-        let entry = fetch_from_host(id)?;
-
-        cache_entry(world, id, entry.clone());
-
-        entry_to_bytes(&entry)
-    }
-
-    fn cached_entry(world: &CompileWorld, id: FileId) -> Option<FileEntry> {
-        let mut runtime = world
-            .runtime
-            .lock()
-            .expect("compile runtime mutex poisoned");
-
-        let entry = runtime.fetched_files.get(&id)?.clone();
-
-        // Cached dependencies must still be recorded on every compile.
-        runtime.dependencies.record_entry(&entry);
-
-        Some(entry)
-    }
-
-    fn cache_entry(world: &CompileWorld, id: FileId, entry: FileEntry) {
-        let mut runtime = world
-            .runtime
-            .lock()
-            .expect("compile runtime mutex poisoned");
-
-        runtime.dependencies.record_entry(&entry);
-        runtime.fetched_files.insert(id, entry);
-    }
-
-    fn fetch_from_host(id: FileId) -> FileResult<FileEntry> {
         let requested_path = crate::paths::file_id_path(id);
-
         let kind = classify_file_kind(id);
-
-        let request = FetchRequest {
-            path: requested_path.clone(),
-            kind,
-        };
-
-        // Do not hold world.runtime's mutex during this call.
-        // Under JSPI, this import may suspend.
-        let fetched = host::fetch(&request).map_err(map_fetch_error)?;
-
         let origin = FileOrigin {
             kind: map_resource_kind(kind),
-            requested_path,
-            resolved_path: fetched.resolved_path,
-            media_type: fetched.media_type,
+            requested_path: requested_path.clone(),
+            resolved_path: None,
+            media_type: None,
         };
+        let fetched = host::fetch(&FetchRequest {
+            path: requested_path,
+            kind,
+        });
+        let (result, origin) = match fetched {
+            Ok(fetched) => (
+                Ok(Bytes::new(fetched.data)),
+                FileOrigin {
+                    resolved_path: fetched.resolved_path,
+                    media_type: fetched.media_type,
+                    ..origin
+                },
+            ),
+            Err(error) => (Err(fetch_error_message(error)), origin),
+        };
+        let result = world
+            .file_store
+            .lock()
+            .expect("file store mutex poisoned")
+            .commit(id, result, origin);
+        record_origin(world, id);
+        result.map_err(|message| FileError::Other(Some(message.into())))
+    }
 
-        Ok(FileEntry::Bytes {
-            bytes: Bytes::new(fetched.data),
-            origin: Some(origin),
-        })
+    fn record_origin(world: &CompileWorld, id: FileId) {
+        let origin = world
+            .file_store
+            .lock()
+            .expect("file store mutex poisoned")
+            .origin(id);
+        if let Some(origin) = origin {
+            world
+                .runtime
+                .lock()
+                .expect("compile runtime mutex poisoned")
+                .dependencies
+                .record_origin(&origin);
+        }
+    }
+
+    fn fetch_error_message(error: FetchError) -> String {
+        match error {
+            FetchError::NotFound => "resource not found".into(),
+            FetchError::Denied => "resource access denied".into(),
+            FetchError::Timeout => "resource fetch timed out".into(),
+            FetchError::Unavailable => "resource loader unavailable".into(),
+            FetchError::Other(message) => message,
+        }
     }
 
     fn classify_file_kind(id: FileId) -> FileKind {
@@ -193,20 +210,6 @@ mod loaders {
             FileKind::Project => ResourceKind::Project,
             FileKind::Package => ResourceKind::Package,
             FileKind::Url => ResourceKind::Url,
-        }
-    }
-
-    fn map_fetch_error(error: FetchError) -> FileError {
-        match error {
-            FetchError::NotFound => FileError::Other(Some("resource not found".into())),
-
-            FetchError::Denied => FileError::Other(Some("resource access denied".into())),
-
-            FetchError::Timeout => FileError::Other(Some("resource fetch timed out".into())),
-
-            FetchError::Unavailable => FileError::Other(Some("resource loader unavailable".into())),
-
-            FetchError::Other(message) => FileError::Other(Some(message.into())),
         }
     }
 

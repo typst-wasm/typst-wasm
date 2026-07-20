@@ -9,6 +9,7 @@ mod state;
 mod world;
 
 mod export;
+mod file_store;
 
 use std::cell::RefCell;
 

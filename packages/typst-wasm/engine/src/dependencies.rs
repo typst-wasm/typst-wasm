@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::state::{FileEntry, FileOrigin, ResourceKind};
+use crate::state::{FileOrigin, ResourceKind};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct DependencyKey {
@@ -25,16 +25,6 @@ impl DependencyTrace {
 
         if self.seen.insert(key) {
             self.ordered.push(origin.clone());
-        }
-    }
-
-    pub fn record_entry(&mut self, entry: &FileEntry) {
-        let origin = match entry {
-            FileEntry::Source { origin, .. } | FileEntry::Bytes { origin, .. } => origin,
-        };
-
-        if let Some(origin) = origin {
-            self.record_origin(origin);
         }
     }
 

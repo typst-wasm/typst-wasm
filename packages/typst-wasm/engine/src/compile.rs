@@ -22,10 +22,17 @@ pub fn compile(
             fonts: state.fonts.clone(),
             files: state.files.clone(),
             persistent_main: state.main_id,
+            file_store: state.file_store.clone(),
         }
     };
 
     let main = resolve_main(options.main.as_deref(), snapshot.persistent_main)?;
+
+    snapshot
+        .file_store
+        .lock()
+        .expect("file store mutex poisoned")
+        .reset();
 
     let format = options.format.unwrap_or(CompileFormat::Pdf);
 
@@ -37,6 +44,7 @@ pub fn compile(
         snapshot.fonts,
         main,
         snapshot.files,
+        snapshot.file_store,
     );
 
     let result = match format {
@@ -56,6 +64,7 @@ struct CompileSnapshot {
     fonts: Vec<typst::text::Font>,
     files: std::collections::HashMap<typst::syntax::FileId, crate::state::FileEntry>,
     persistent_main: Option<typst::syntax::FileId>,
+    file_store: std::sync::Arc<std::sync::Mutex<crate::file_store::FileStore>>,
 }
 
 fn resolve_main(
