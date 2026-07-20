@@ -9,12 +9,7 @@ pub fn export(
     bundle: &typst_bundle::Bundle,
     options: &CompileOptions,
 ) -> Result<CompilePayload, CompileFailure> {
-    let ppi = options.ppi.unwrap_or(144.0);
-    if !ppi.is_finite() || ppi <= 0.0 {
-        return Err(crate::diagnostics::simple_compile_failure(
-            "PPI must be a positive finite number",
-        ));
-    }
+    let ppi = super::validate_ppi(options.ppi.unwrap_or(144.0))?;
 
     let export_options = BundleOptions {
         html: typst_html::HtmlOptions { pretty: false },

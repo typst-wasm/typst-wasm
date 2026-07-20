@@ -78,6 +78,15 @@ fn invalid_page_range(input: &str) -> CompileFailure {
     crate::diagnostics::simple_compile_failure(format!("invalid page range: {input}"))
 }
 
+fn validate_ppi(ppi: f32) -> Result<f32, CompileFailure> {
+    if !ppi.is_finite() || ppi <= 0.0 {
+        return Err(crate::diagnostics::simple_compile_failure(
+            "PPI must be a positive finite number",
+        ));
+    }
+    Ok(ppi)
+}
+
 fn parse_page_number(input: &str, range: &str) -> Result<usize, CompileFailure> {
     input
         .parse::<usize>()
@@ -255,5 +264,13 @@ mod tests {
         assert!(PageRange::Between(2, 4).includes(2));
         assert!(PageRange::Between(2, 4).includes(4));
         assert!(!PageRange::Between(2, 4).includes(5));
+    }
+
+    #[test]
+    fn validates_positive_finite_ppi() {
+        for ppi in [0.0, -1.0, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            assert!(validate_ppi(ppi).is_err(), "accepted {ppi:?}");
+        }
+        assert_eq!(validate_ppi(144.0).unwrap(), 144.0);
     }
 }

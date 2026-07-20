@@ -8,7 +8,7 @@ pub fn export(
     document: &PagedDocument,
     options: &CompileOptions,
 ) -> Result<CompilePayload, CompileFailure> {
-    let ppi = options.ppi.unwrap_or(144.0);
+    let ppi = super::validate_ppi(options.ppi.unwrap_or(144.0))?;
     let pixel_per_pt = ppi / 72.0;
 
     use typst::utils::Scalar;
