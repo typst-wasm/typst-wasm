@@ -21,6 +21,10 @@ pub fn normalize_project_path(input: &str) -> Result<String, OperationError> {
         return Err(OperationError::InvalidPath("path cannot be empty".into()));
     }
 
+    if input.contains('\\') {
+        return Err(OperationError::InvalidPath("invalid project path".into()));
+    }
+
     let path = Path::new(input);
 
     if path.is_absolute() {
@@ -70,5 +74,32 @@ pub fn file_id_path(id: FileId) -> String {
     match id.root() {
         VirtualRoot::Project => path,
         VirtualRoot::Package(package) => format!("{package}/{path}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalizes_project_paths() {
+        assert_eq!(
+            normalize_project_path("a/./tmp/../b.typ").unwrap(),
+            "a/b.typ"
+        );
+        assert_eq!(normalize_project_path("a//b.typ").unwrap(), "a/b.typ");
+    }
+
+    #[test]
+    fn rejects_paths_outside_the_project() {
+        for input in ["", "  ", ".", "..", "../a", "a/../../b", "/a", "a\\b"] {
+            assert!(normalize_project_path(input).is_err(), "accepted {input:?}");
+        }
+    }
+
+    #[test]
+    fn project_file_id_round_trips_to_normalized_path() {
+        let id = project_file_id("./src/../main.typ").unwrap();
+        assert_eq!(file_id_path(id), "main.typ");
     }
 }
