@@ -104,3 +104,83 @@ impl FileStore {
 fn source_size(source: &Source) -> usize {
     source.text().len().max(1)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::paths::project_file_id;
+    use crate::state::ResourceKind;
+
+    fn origin(path: &str) -> FileOrigin {
+        FileOrigin {
+            kind: ResourceKind::Project,
+            requested_path: path.into(),
+            resolved_path: None,
+            media_type: None,
+        }
+    }
+
+    #[test]
+    fn reset_drops_fetched_state_but_retains_source() {
+        let id = project_file_id("main.typ").unwrap();
+        let mut store = FileStore::new();
+        store.begin(id);
+        store.replace_source(id, Source::new(id, "= Main".into()));
+        let _ = store.commit(id, Err("not found".into()), origin("main.typ"));
+
+        store.reset();
+
+        let current = store.begin(id).unwrap();
+        assert_eq!(current.0.unwrap().text(), "= Main");
+        assert!(current.1.is_none());
+        assert!(store.origin(id).is_none());
+    }
+
+    #[test]
+    fn begin_reuses_success_and_failure_until_reset() {
+        let id = project_file_id("data.txt").unwrap();
+        let mut store = FileStore::new();
+        store.begin(id);
+        let _ = store.commit(id, Ok(Bytes::new(vec![1, 2])), origin("data.txt"));
+        assert_eq!(
+            store.begin(id).unwrap().1.unwrap().unwrap().as_slice(),
+            &[1, 2]
+        );
+
+        store.reset();
+        store.begin(id);
+        let _ = store.commit(id, Err("denied".into()), origin("data.txt"));
+        assert_eq!(store.begin(id).unwrap().1.unwrap().unwrap_err(), "denied");
+    }
+
+    #[test]
+    fn replacing_source_updates_retained_byte_accounting() {
+        let id = project_file_id("main.typ").unwrap();
+        let mut store = FileStore::new();
+        store.begin(id);
+        store.replace_source(id, Source::new(id, "12345".into()));
+        assert_eq!(store.retained_source_bytes, 5);
+        store.replace_source(id, Source::new(id, "12".into()));
+        assert_eq!(store.retained_source_bytes, 2);
+    }
+
+    #[test]
+    fn source_budget_is_not_exceeded_after_eviction() {
+        let first = project_file_id("first.typ").unwrap();
+        let second = project_file_id("second.typ").unwrap();
+        let mut store = FileStore::new();
+        store.source_budget = 3;
+        store.begin(first);
+        store.begin(second);
+        store.replace_source(first, Source::new(first, "12".into()));
+        store.replace_source(second, Source::new(second, "34".into()));
+
+        assert!(store.retained_source_bytes <= store.source_budget);
+        let retained: usize = store
+            .slots
+            .values()
+            .filter_map(|slot| slot.source.as_ref().map(source_size))
+            .sum();
+        assert!(retained <= store.source_budget);
+    }
+}
