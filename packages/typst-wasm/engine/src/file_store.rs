@@ -77,6 +77,7 @@ impl FileStore {
             .saturating_sub(slot.source.as_ref().map_or(0, source_size));
         self.retained_source_bytes += source_size(&source);
         slot.source = Some(source);
+        self.evict();
     }
 
     pub fn origin(&self, id: FileId) -> Option<FileOrigin> {

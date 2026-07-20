@@ -47,8 +47,9 @@ describe("project paths", () => {
     expect(normalizeProjectPath(input)).toBe(expected);
   });
 
-  it.each(["", "../main.typ", "/main.typ", "./"])("rejects %s", (input) =>
-    expect(() => normalizeProjectPath(input)).toThrow(),
+  it.each(["", "../main.typ", "/main.typ", "./", "a\\b.typ"])(
+    "rejects %s",
+    (input) => expect(() => normalizeProjectPath(input)).toThrow(),
   );
 });
 

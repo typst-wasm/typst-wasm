@@ -2,6 +2,7 @@
 export const normalizeProjectPath = (input: string): string => {
   if (input.trim().length === 0) throw new Error("path cannot be empty");
   if (input.startsWith("/")) throw new Error("absolute paths are not allowed");
+  if (input.includes("\\")) throw new Error("invalid project path");
 
   const parts: string[] = [];
   for (const part of input.split("/")) {

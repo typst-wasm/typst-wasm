@@ -36,7 +36,7 @@ export class MemoryFileLoader {
   }
 
   listFiles(): string[] {
-    return [...this.files.keys()];
+    return [...this.files.keys()].sort();
   }
 
   hasFile(path: string): boolean {
