@@ -14,6 +14,8 @@ pub struct FileSlot {
     pub accessed: bool,
 }
 
+pub type CurrentFile = (Option<Source>, Option<Result<Bytes, String>>);
+
 pub struct FileStore {
     pub slots: HashMap<FileId, FileSlot>,
     retained_source_bytes: usize,
@@ -38,7 +40,7 @@ impl FileStore {
         self.evict();
     }
 
-    pub fn begin(&mut self, id: FileId) -> Option<(Option<Source>, Option<Result<Bytes, String>>)> {
+    pub fn begin(&mut self, id: FileId) -> Option<CurrentFile> {
         let slot = self.slots.entry(id).or_insert_with(|| FileSlot {
             source: None,
             bytes: None,
