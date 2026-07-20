@@ -123,7 +123,6 @@ pub fn parse_page_ranges(input: &str) -> Result<Vec<PageRange>, CompileFailure> 
     let ranges = input
         .split(',')
         .map(str::trim)
-        .filter(|part| !part.is_empty())
         .map(parse_single_range)
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -217,4 +216,44 @@ pub fn convert_diagnostics(
     );
 
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_page_range_forms() {
+        assert_eq!(
+            parse_page_ranges("1, 3-, -4, 2-5").unwrap(),
+            vec![
+                PageRange::Exact(1),
+                PageRange::From(3),
+                PageRange::To(4),
+                PageRange::Between(2, 5),
+            ]
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_page_ranges() {
+        for input in [
+            "", "0", "-0", "0-2", "5-2", "-", "1-2-3", "abc", "1,,2", "1,", ",1",
+        ] {
+            assert!(parse_page_ranges(input).is_err(), "accepted {input:?}");
+        }
+    }
+
+    #[test]
+    fn page_ranges_have_inclusive_boundaries() {
+        assert!(PageRange::Exact(2).includes(2));
+        assert!(!PageRange::Exact(2).includes(1));
+        assert!(PageRange::From(2).includes(usize::MAX));
+        assert!(!PageRange::From(2).includes(1));
+        assert!(PageRange::To(2).includes(1));
+        assert!(!PageRange::To(2).includes(3));
+        assert!(PageRange::Between(2, 4).includes(2));
+        assert!(PageRange::Between(2, 4).includes(4));
+        assert!(!PageRange::Between(2, 4).includes(5));
+    }
 }
